@@ -23,18 +23,12 @@ VALIDATE(){
     local package_name=$2
     
     if [ "$exit_code" -ne 0 ]; then
-        echo -e "Installing $package_name ... ${R}FAILURE${N}" | tee -a "$LOG_FILE"
+        echo -e "$2 ... ${R}FAILURE${N}" | tee -a "$LOG_FILE"
         exit 1
     else
-        echo -e "Installing $package_name ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+        echo -e "$2 ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
     fi
 }
-
-# Check if mongo.repo exists before copying
-if [ ! -f "mongo.repo" ]; then
-    echo -e "${R}ERROR:: mongo.repo file not found in current directory${N}" | tee -a "$LOG_FILE"
-    exit 1
-fi
 
 cp mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
 VALIDATE $? "Adding Mongo repo"
@@ -49,4 +43,5 @@ systemctl start mongod &>>"$LOG_FILE"
 VALIDATE $? "Start MongoDB"
 
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
+
 
