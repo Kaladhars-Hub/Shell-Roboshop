@@ -31,55 +31,85 @@ VALIDATE(){
     fi
 }
 
+# Disable and enable NodeJS module
 dnf module disable nodejs -y &>>"$LOG_FILE"
 VALIDATE $? "Disabling NodeJS"
+
 dnf module enable nodejs:20 -y &>>"$LOG_FILE"
 VALIDATE $? "Enabling NodeJS"
+
 dnf install nodejs -y &>>"$LOG_FILE"
 VALIDATE $? "Installing NodeJS"
 
+# Create /app directory first (before creating user)
+if [ ! -d /app ]; then
+    mkdir -p /app &>>"$LOG_FILE"
+    VALIDATE $? "Creating app directory"
+else
+    echo -e "App directory already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
+
+# Check if roboshop user exists, if not create it
 id roboshop &>>"$LOG_FILE"
 if [ $? -ne 0 ]; then
     useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>"$LOG_FILE"
     VALIDATE $? "Creating system user"
 else
-    echo -e "user already exist ... $Y SKIPPING $N"
-fi     
+    echo -e "User already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
 
-mkdir /app
-VALIDATE $? "Creating app directory"
-
-curl -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip 
+# Download catalogue application
+curl -L -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip &>>"$LOG_FILE"
 VALIDATE $? "Downloading catalogue application"
 
+# Change to app directory
 cd /app 
-VALIDATE $? "Changig to app directory"
+VALIDATE $? "Changing to app directory"
 
-rm -rf /app/*
-VALIDATE $ "Removing existing code"
+# Remove existing code
+rm -rf /app/* &>>"$LOG_FILE"
+VALIDATE $? "Removing existing code"
 
-unzip /tmp/catalogue.zip &>>"$LOG_FILE"
+# Unzip catalogue
+unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
 VALIDATE $? "Unzip catalogue"
 
+# Change to app directory again (in case unzip created subdirectory)
 cd /app 
-VALIDATE $? "Changig to app directory"
+VALIDATE $? "Changing to app directory"
 
+# Install dependencies
 npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
-cp catalogue.service /etc/systemd/system/catalogue.service
+# Copy systemd service file
+cp /app/systemd.service /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
 VALIDATE $? "Copy systemctl service"
 
-systemctl daemon-reload
+# Reload daemon and enable service
+systemctl daemon-reload &>>"$LOG_FILE"
+VALIDATE $? "Daemon reload"
+
 systemctl enable catalogue &>>"$LOG_FILE"
 VALIDATE $? "Enable catalogue"
 
-cp mongo.repo /etc/yum.repos.d/mongo.repo
+systemctl start catalogue &>>"$LOG_FILE"
+VALIDATE $? "Start catalogue"
+
+# Copy mongo repo
+cp /app/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
 VALIDATE $? "Copy mongo repo"
+
+# Install mongodb client
 dnf install mongodb-mongosh -y &>>"$LOG_FILE"
 VALIDATE $? "Install mongodb client"
+
+# Load catalogue products into MongoDB
 mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
 VALIDATE $? "Load catalogue products"
-systemctl restart catalogue
+
+# Restart catalogue service
+systemctl restart catalogue &>>"$LOG_FILE"
 VALIDATE $? "Restarted catalogue"
 
+echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
