@@ -138,8 +138,16 @@ EOF
 fi
 
 # Install mongodb client
-dnf install mongodb-mongosh -y &>>"$LOG_FILE"
-VALIDATE $? "Install mongodb client"
+if dnf install mongodb-mongosh-shared-openssl3 -y &>>"$LOG_FILE"; then
+    echo -e "Install mongodb client ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+elif dnf install mongodb-org-mongosh -y &>>"$LOG_FILE"; then
+    echo -e "Install mongodb client ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+elif dnf install -y https://downloads.mongodb.com/compass/mongodb-mongosh-2.3.2.x86_64.rpm &>>"$LOG_FILE"; then
+    echo -e "Install mongodb client ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+else
+    echo -e "Install mongodb client ... ${R}FAILURE${N}" | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 # Fix: Check if master-data.js exists before loading
 if [ -f /app/db/master-data.js ]; then
@@ -158,3 +166,4 @@ echo -e "\nService Status:" | tee -a "$LOG_FILE"
 systemctl status catalogue --no-pager -l | tee -a "$LOG_FILE"
 
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
+
