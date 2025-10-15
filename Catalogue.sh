@@ -74,10 +74,6 @@ VALIDATE $? "Removing existing code"
 unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
 VALIDATE $? "Unzip catalogue"
 
-# Change to app directory again (in case unzip created subdirectory)
-cd /app 
-VALIDATE $? "Changing to app directory"
-
 # Install dependencies
 npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
