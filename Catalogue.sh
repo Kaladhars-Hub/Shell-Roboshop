@@ -74,13 +74,41 @@ VALIDATE $? "Removing existing code"
 unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
 VALIDATE $? "Unzip catalogue"
 
+# Fix: Find the actual application directory
+# If unzip created a subdirectory, navigate into it
+if [ -d /app/catalogue ]; then
+    cd /app/catalogue
+    # Copy all contents to /app root
+    cp -r . /app/
+    cd /app
+fi
+
+VALIDATE $? "Changing to app directory"
+
 # Install dependencies
 npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
-# Copy systemd service file
-cp /app/systemd.service /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
-VALIDATE $? "Copy systemctl service"
+# Fix: Create the systemd service file manually since it might not exist
+cat > /etc/systemd/system/catalogue.service <<EOF
+[Unit]
+Description = Catalogue Service
+[Service]
+User=roboshop
+Environment=MONGO=true
+Environment=MONGO_URL="mongodb://${MONGODB_HOST}:27017/catalogue"
+ExecStart=/bin/node /app/server.js
+SyslogIdentifier=catalogue
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+VALIDATE $? "Create systemd service file"
+
+# Fix: Change ownership of /app to roboshop user
+chown -R roboshop:roboshop /app &>>"$LOG_FILE"
+VALIDATE $? "Change app ownership"
 
 # Reload daemon and enable service
 systemctl daemon-reload &>>"$LOG_FILE"
@@ -92,20 +120,41 @@ VALIDATE $? "Enable catalogue"
 systemctl start catalogue &>>"$LOG_FILE"
 VALIDATE $? "Start catalogue"
 
-# Copy mongo repo
-cp /app/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
-VALIDATE $? "Copy mongo repo"
+# Fix: Check if mongo.repo exists in /app before copying
+if [ -f /app/mongo.repo ]; then
+    cp /app/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
+    VALIDATE $? "Copy mongo repo"
+else
+    # Create mongo.repo if it doesn't exist
+    cat > /etc/yum.repos.d/mongo.repo <<EOF
+[mongodb-org-6.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/\$releasever/mongodb-org/6.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-6.0.asc
+EOF
+    VALIDATE $? "Create mongo repo"
+fi
 
 # Install mongodb client
 dnf install mongodb-mongosh -y &>>"$LOG_FILE"
 VALIDATE $? "Install mongodb client"
 
-# Load catalogue products into MongoDB
-mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
-VALIDATE $? "Load catalogue products"
+# Fix: Check if master-data.js exists before loading
+if [ -f /app/db/master-data.js ]; then
+    mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
+    VALIDATE $? "Load catalogue products"
+else
+    echo -e "Master data file not found ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
 
 # Restart catalogue service
 systemctl restart catalogue &>>"$LOG_FILE"
 VALIDATE $? "Restarted catalogue"
+
+# Fix: Check service status
+echo -e "\nService Status:" | tee -a "$LOG_FILE"
+systemctl status catalogue --no-pager -l | tee -a "$LOG_FILE"
 
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
