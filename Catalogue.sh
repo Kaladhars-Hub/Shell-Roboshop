@@ -43,11 +43,16 @@ dnf install nodejs -y &>>"$LOG_FILE"
 VALIDATE $? "Installing NodeJS"
 
 # Check if roboshop user exists, if not create it
-useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>"$LOG_FILE"
-VALIDATE $? "Creating system user"
+id roboshop &>>"$LOG_FILE"
+if [ $? -ne 0 ]; then
+    useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>"$LOG_FILE"
+    VALIDATE $? "Creating system user"
+else
+    echo -e "User already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
 
 # Create /app directory first (before creating user)
-    mkdir /app &>>"$LOG_FILE"
+    mkdir -p /app &>>"$LOG_FILE"
     VALIDATE $? "Creating app directory"
 
 # Download catalogue application
@@ -85,7 +90,7 @@ systemctl start catalogue &>>"$LOG_FILE"
 VALIDATE $? "Start catalogue"
 
 # Copy mongo repo
-cp mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
+cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
 VALIDATE $? "Copy mongo repo"
 
 # Install mongodb client
