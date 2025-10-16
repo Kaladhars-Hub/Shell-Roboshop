@@ -86,9 +86,6 @@ VALIDATE $? "Daemon reload"
 systemctl enable catalogue &>>"$LOG_FILE"
 VALIDATE $? "Enable catalogue"
 
-systemctl start catalogue &>>"$LOG_FILE"
-VALIDATE $? "Start catalogue"
-
 # Copy mongo repo
 cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
 VALIDATE $? "Copy mongo repo"
