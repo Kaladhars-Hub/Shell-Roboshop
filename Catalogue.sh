@@ -8,6 +8,7 @@ N="\e[0m"
 
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
+SCRIPT_DIR=$PWD
 MONGODB_HOST=mongodb.awslearning.fun
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 
@@ -70,7 +71,7 @@ npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
 # Copy systemd service file
-cp catalogue.service /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
+cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
 VALIDATE $? "Copy systemctl service"
 
 # Reload daemon and enable service
