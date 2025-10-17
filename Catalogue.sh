@@ -82,7 +82,7 @@ npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
 # Create systemd service file
-cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service <<EOF
+cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service
 VALIDATE $? "Copy systemctl service"
 
 # Set proper ownership for /app
@@ -130,3 +130,4 @@ echo "=============================================="
 echo -e "${G}Catalogue Installation - COMPLETED${N}" | tee -a "$LOG_FILE"
 echo "=============================================="
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
+
