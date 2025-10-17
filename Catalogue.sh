@@ -8,7 +8,6 @@ N="\e[0m"
 
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-SCRIPT_DIR=$PWD
 MONGODB_HOST=mongodb.awslearning.fun
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 
@@ -42,6 +41,14 @@ VALIDATE $? "Enabling NodeJS"
 dnf install nodejs -y &>>"$LOG_FILE"
 VALIDATE $? "Installing NodeJS"
 
+# Create /app directory first
+if [ ! -d /app ]; then
+    mkdir -p /app &>>"$LOG_FILE"
+    VALIDATE $? "Creating app directory"
+else
+    echo -e "App directory already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
+
 # Check if roboshop user exists, if not create it
 id roboshop &>>"$LOG_FILE"
 if [ $? -ne 0 ]; then
@@ -51,12 +58,11 @@ else
     echo -e "User already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
 fi
 
-# Create /app directory first (before creating user)
-    mkdir -p /app &>>"$LOG_FILE"
-    VALIDATE $? "Creating app directory"
-
-# Download catalogue application
-curl -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip &>>"$LOG_FILE"
+# Download catalogue application (try GitHub if S3 fails)
+if ! curl -f -L -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip &>>"$LOG_FILE"; then
+    echo -e "S3 download failed, trying GitHub..." | tee -a "$LOG_FILE"
+    curl -f -L -o /tmp/catalogue.zip https://github.com/roboshop-devops-project/catalogue/archive/refs/heads/main.zip &>>"$LOG_FILE"
+fi
 VALIDATE $? "Downloading catalogue application"
 
 # Change to app directory
@@ -68,38 +74,59 @@ rm -rf /app/* &>>"$LOG_FILE"
 VALIDATE $? "Removing existing code"
 
 # Unzip catalogue
-unzip /tmp/catalogue.zip &>>"$LOG_FILE"
+unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
 VALIDATE $? "Unzip catalogue"
 
 # Install dependencies
 npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
-# Copy systemd service file
-cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
+# Create systemd service file
+cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service <<EOF
 VALIDATE $? "Copy systemctl service"
 
-# Reload daemon and enable service
+# Set proper ownership for /app
+chown -R roboshop:roboshop /app &>>"$LOG_FILE"
+VALIDATE $? "Set app directory ownership"
+
+# Reload daemon and enable service 
 systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Daemon reload"
 
 systemctl enable catalogue &>>"$LOG_FILE"
 VALIDATE $? "Enable catalogue"
 
-# Copy mongo repo
-cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
-VALIDATE $? "Copy mongo repo"
+systemctl start catalogue &>>"$LOG_FILE"
+VALIDATE $? "Start catalogue"
+
+# Create MongoDB repository
+cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongodb-org-7.0.repo <<EOF
+VALIDATE $? "Copy mongo repository"
 
 # Install mongodb client
-dnf install mongodb-mongosh -y &>>"$LOG_FILE"
+dnf instal mongodb-mongosh -y &>>$LOG_FILE
 VALIDATE $? "Install mongodb client"
+
+# Wait for MongoDB to be ready
+echo -e "Waiting for MongoDB to be ready..." | tee -a "$LOG_FILE"
+for i in {1..30}; do
+    if mongosh --host $MONGODB_HOST --eval "db.version()" &>>"$LOG_FILE"; then
+        echo -e "MongoDB is ready!" | tee -a "$LOG_FILE"
+        break
+    fi
+    echo -e "Attempt $i/30 - Waiting for MongoDB..." | tee -a "$LOG_FILE"
+    sleep 2
+done
 
 # Load catalogue products into MongoDB
 mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
 VALIDATE $? "Load catalogue products"
 
-# Restart catalogue service
+# Restart catalogue service to apply changes
 systemctl restart catalogue &>>"$LOG_FILE"
 VALIDATE $? "Restarted catalogue"
 
+echo "=============================================="
+echo -e "${G}Catalogue Installation - COMPLETED${N}" | tee -a "$LOG_FILE"
+echo "=============================================="
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
