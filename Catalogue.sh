@@ -77,19 +77,43 @@ VALIDATE $? "Removing existing code"
 unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
 VALIDATE $? "Unzip catalogue"
 
+# Move files from subdirectory if needed
+if [ -d /app/catalogue-main ]; then
+    mv /app/catalogue-main/* /app/ &>>"$LOG_FILE"
+    rm -rf /app/catalogue-main &>>"$LOG_FILE"
+fi
+
 # Install dependencies
 npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
 # Create systemd service file
-cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service
-VALIDATE $? "Copy systemctl service"
+cat > /etc/systemd/system/catalogue.service <<EOF
+[Unit]
+Description=Catalogue Service
+After=network.target
+
+[Service]
+Type=simple
+User=roboshop
+WorkingDirectory=/app
+Environment="MONGO=true"
+Environment="MONGO_URL=mongodb://$MONGODB_HOST:27017/catalogue"
+ExecStart=/usr/bin/node /app/server.js
+SyslogIdentifier=catalogue
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+VALIDATE $? "Create systemctl service"
 
 # Set proper ownership for /app
 chown -R roboshop:roboshop /app &>>"$LOG_FILE"
 VALIDATE $? "Set app directory ownership"
 
-# Reload daemon and enable service 
+# Reload daemon and enable service
 systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Daemon reload"
 
@@ -100,11 +124,21 @@ systemctl start catalogue &>>"$LOG_FILE"
 VALIDATE $? "Start catalogue"
 
 # Create MongoDB repository
-cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongodb-org-7.0.repo <<EOF
-VALIDATE $? "Copy mongo repository"
+cat > /etc/yum.repos.d/mongodb-org-7.0.repo <<EOF
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://pgp.mongodb.com/server-7.0.asc
+EOF
+VALIDATE $? "Create MongoDB repository"
 
 # Install mongodb client
-dnf instal mongodb-mongosh -y &>>$LOG_FILE
+dnf clean all &>>"$LOG_FILE"
+if ! dnf install mongodb-mongosh-shared-openssl3 -y &>>"$LOG_FILE"; then
+    dnf install -y https://downloads.mongodb.com/compass/mongodb-mongosh-2.3.2.x86_64.rpm &>>"$LOG_FILE"
+fi
 VALIDATE $? "Install mongodb client"
 
 # Wait for MongoDB to be ready
@@ -130,4 +164,3 @@ echo "=============================================="
 echo -e "${G}Catalogue Installation - COMPLETED${N}" | tee -a "$LOG_FILE"
 echo "=============================================="
 echo "Script completed at: $(date)" | tee -a "$LOG_FILE"
-
