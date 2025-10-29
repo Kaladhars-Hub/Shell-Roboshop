@@ -85,8 +85,8 @@ VALIDATE $? "Install NodeJS"
 
 echo -e "\n${Y}=== SETTING UP APPLICATION ===${N}" | tee -a "$LOG_FILE"
 
-# Create app directory
-[ ! -d /app ] && mkdir -p /app &>>"$LOG_FILE"
+rm -rf /app &>/dev/null
+mkdir -p /app &>>"$LOG_FILE"
 VALIDATE $? "Create app directory"
 
 # Create user
