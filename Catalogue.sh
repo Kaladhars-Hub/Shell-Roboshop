@@ -236,7 +236,18 @@ setup_database() {
         dnf install -y https://downloads.mongodb.com/compass/mongodb-mongosh-2.3.2.x86_64.rpm &>>"$LOG_FILE"
     fi
     VALIDATE $? "Install MongoDB client"
-     
+    
+    # Wait for MongoDB to be ready (important for automation)
+    echo -e "${Y}Waiting for MongoDB to be ready...${N}" | tee -a "$LOG_FILE"
+    for i in {1..30}; do  # Try 30 times with 2-second intervals
+        if mongosh --host $MONGODB_HOST --eval "db.version()" &>>"$LOG_FILE"; then
+            echo -e "${G}MongoDB is ready!${N}" | tee -a "$LOG_FILE"
+            break
+        fi
+        echo -e "Attempt $i/30 - Waiting for MongoDB..." | tee -a "$LOG_FILE"
+        sleep 2  # Wait 2 seconds before retry
+    done
+    
     # Load initial data into MongoDB (products, categories, etc.)
     echo "Loading initial data into MongoDB..." | tee -a "$LOG_FILE"
     mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
