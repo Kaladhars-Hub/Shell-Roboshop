@@ -43,6 +43,7 @@ MONGODB_HOST="mongodb.awslearning.fun"                  # MongoDB server address
 # Function to create logs directory if it doesn't exist
 setup_logging() {
     mkdir -p "$LOGS_FOLDER"                             # -p creates parent directories if needed
+    touch "$LOG_FILE"
     echo "Script started at: $(date)" | tee -a "$LOG_FILE"  # tee shows output AND writes to log
 }
 
