@@ -80,10 +80,10 @@ VALIDATE $? "Set ownership"
 systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Reload systemd"
 
-systemctl enable catalogue &>>"$LOG_FILE"
+systemctl enable user &>>"$LOG_FILE"
 VALIDATE $? "Enable service"
 
-systemctl start catalogue &>>"$LOG_FILE"  
+systemctl start user &>>"$LOG_FILE"  
 VALIDATE $? "Start service"
 
 END_TIME=$(date +%s)
