@@ -83,11 +83,11 @@ systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Reload systemd"
 
 systemctl enable user &>>"$LOG_FILE"
-VALIDATE $? "Enabling service"
+VALIDATE $? "Enable service"  # ✅ FIXED: Changed "Enabling service" to "Enable service"
 
 systemctl start user &>>"$LOG_FILE"  
 VALIDATE $? "Start service"
 
 END_TIME=$(date +%s)
-TOTAL_TIME=$(( $END_TIME - $START_TIME))
-echo -e "Script executed in: $Y $TOTAL_TIME Seconds $N"
+TOTAL_TIME=$((END_TIME - START_TIME))
+echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE" 
