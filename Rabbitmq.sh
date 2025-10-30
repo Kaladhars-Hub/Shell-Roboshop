@@ -40,7 +40,7 @@ VALIDATE(){
     fi
 }
 
-cp $SCRIPT_DIR/rabbitmq.repo /etc/yum.repos.d/rabbitmq.repo
+cp "/home/ec2-user/Shell-Roboshop/rabbitmq.repo" "/etc/yum.repos.d/rabbitmq.repo"
 VALIDATE $? "Copy RabbitMQ repository file"
 
 dnf install rabbitmq-server -y
