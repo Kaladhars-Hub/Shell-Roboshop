@@ -57,7 +57,9 @@ id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin ro
 VALIDATE $? "Create roboshop user"
 
 # Download and deploy app
-curl -L -o /tmp/user.zip https://roboshop-artifacts.s3.amazonaws.com/user-v3.zip VALIDATE $? "Download application"
+curl -L -o /tmp/user.zip https://roboshop-artifacts.s3.amazonaws.com/user-v3.zip &>>"$LOG_FILE"  # ✅ FIXED: Added &>>"$LOG_FILE" and line break
+VALIDATE $? "Download application"
+
 cd /app && unzip -o /tmp/user.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
@@ -81,7 +83,7 @@ systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Reload systemd"
 
 systemctl enable user &>>"$LOG_FILE"
-VALIDATE $? "Enable service"
+VALIDATE $? "Enabling service"
 
 systemctl start user &>>"$LOG_FILE"  
 VALIDATE $? "Start service"
