@@ -40,8 +40,12 @@ VALIDATE $? "Installing python3 gcc python3-devel-server"
 id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
 VALIDATE $? "Create roboshop user"
 
+# ✅ ADD THIS LINE: Create /app directory before using it
+mkdir -p /app &>>"$LOG_FILE"
+VALIDATE $? "Create app directory"
+
 # Download and deploy app
-curl -L -o /tmp/payment.zip https://roboshop-artifacts.s3.amazonaws.com/payment-v3.zip  &>>"$LOG_FILE"  # ✅ FIXED: Added &>>"$LOG_FILE" and line break
+curl -L -o /tmp/payment.zip https://roboshop-artifacts.s3.amazonaws.com/payment-v3.zip  &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
 cd /app && unzip -o /tmp/payment.zip &>>"$LOG_FILE"
@@ -67,11 +71,11 @@ systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Reload systemd"
 
 systemctl enable payment &>>"$LOG_FILE"
-VALIDATE $? "Enable service"  # ✅ FIXED: Changed "Enabling service" to "Enable service"
+VALIDATE $? "Enable service"
 
 systemctl start payment &>>"$LOG_FILE"  
 VALIDATE $? "Start service"
 
 END_TIME=$(date +%s)
 TOTAL_TIME=$((END_TIME - START_TIME))
-echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE" 
+echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE"
