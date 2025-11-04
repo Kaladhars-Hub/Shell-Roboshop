@@ -5,7 +5,7 @@ R="\e[31m"; G="\e[32m"; Y="\e[33m"; N="\e[0m"
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
 SCRIPT_DIR=$(pwd)
-MONGODB_HOST=mongodb.awslearning.fun
+MYSQL_HOST=mysql.awslearning.fun
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 
 mkdir -p "$LOGS_FOLDER"
