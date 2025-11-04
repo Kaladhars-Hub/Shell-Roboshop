@@ -42,26 +42,24 @@ VALIDATE $? "Create roboshop user"
 mkdir -p /app &>>"$LOG_FILE"
 VALIDATE $? "Create app directory"
 
-curl -L -o /tmp/dispatch.zip https://roboshop-artifacts.s3.amazonaws.com/dispatch.zip &>>"$LOG_FILE"
+# Download and deploy app
+curl -L -o /tmp/shipping.zip https://roboshop-artifacts.s3.amazonaws.com/shipping-v3.zip &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
-cd /app && unzip -o /tmp/dispatch.zip &>>"$LOG_FILE"
+cd /app && unzip -o /tmp/shipping.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
-cd /app
-[ -f "go.mod" ] || go mod init dispatch &>>"$LOG_FILE"
-VALIDATE $? "Initialize Go module"
+cd /app && mvn clean package &>>"$LOG_FILE"
+VALIDATE $? "Build application"
 
-go get &>>"$LOG_FILE"
-VALIDATE $? "Download Go dependencies"
-
-go build &>>"$LOG_FILE"
-VALIDATE $? "Build Go application"
+cd /app && mv target/shipping-1.0.jar shipping.jar &>>"$LOG_FILE"
+VALIDATE $? "Rename JAR file"
 
 # SERVICE SETUP SECTION
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 
-cp $SCRIPT_DIR/dispatch.service /etc/systemd/system/dispatch.service &>>"$LOG_FILE"
+# ✅ FIXED: Copy shipping.service (not dispatch.service)
+cp $SCRIPT_DIR/shipping.service /etc/systemd/system/shipping.service &>>"$LOG_FILE"
 VALIDATE $? "Copy service file"
 
 chown -R roboshop:roboshop /app &>>"$LOG_FILE"
