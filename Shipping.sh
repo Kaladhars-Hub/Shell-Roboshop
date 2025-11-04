@@ -39,31 +39,29 @@ VALIDATE $? "Installing Maven"
 id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
 VALIDATE $? "Create roboshop user"
 
-# ✅ ADD THIS LINE: Create /app directory before using it
 mkdir -p /app &>>"$LOG_FILE"
 VALIDATE $? "Create app directory"
 
-# Download and deploy app
-curl -L -o /tmp/shipping.zip https://roboshop-artifacts.s3.amazonaws.com/shipping-v3.zip &>>"$LOG_FILE"
+curl -L -o /tmp/dispatch.zip https://roboshop-artifacts.s3.amazonaws.com/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
-cd /app && unzip -o /tmp/shipping.zip &>>"$LOG_FILE"
+cd /app && unzip -o /tmp/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
-cd /app && mvn clean package &>>"$LOG_FILE"
-VALIDATE $? "Build application"
+cd /app
+[ -f "go.mod" ] || go mod init dispatch &>>"$LOG_FILE"
+VALIDATE $? "Initialize Go module"
 
-cd /app && mv target/shipping-1.0.jar shipping.jar &>>"$LOG_FILE"
-VALIDATE $? "Rename JAR file"
+go get &>>"$LOG_FILE"
+VALIDATE $? "Download Go dependencies"
 
-# ====================
-# SECTION 6: SERVICE SETUP (USING COPY)
-# ====================
+go build &>>"$LOG_FILE"
+VALIDATE $? "Build Go application"
 
+# SERVICE SETUP SECTION
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 
-# Copy service file - PROFESSIONAL APPROACH
-cp $SCRIPT_DIR/shipping.service /etc/systemd/system/shipping.service
+cp $SCRIPT_DIR/dispatch.service /etc/systemd/system/dispatch.service &>>"$LOG_FILE"
 VALIDATE $? "Copy service file"
 
 chown -R roboshop:roboshop /app &>>"$LOG_FILE"
