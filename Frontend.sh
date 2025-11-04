@@ -9,7 +9,6 @@ N="\e[0m"
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-MONGODB_HOST=mongodb.awslearning.fun
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 START_TIME=$(date +%s)
 
@@ -33,52 +32,64 @@ VALIDATE(){
     fi
 }
 
+# ====================
+# NGINX INSTALLATION
+# ====================
+
+echo -e "\n${Y}=== INSTALLING NGINX ===${N}" | tee -a "$LOG_FILE"
+
 dnf module disable nginx -y &>>"$LOG_FILE"
 VALIDATE $? "Disable nginx"
 
 dnf module enable nginx:1.24 -y &>>"$LOG_FILE"
-VALIDATE $? "Enable nginx"
+VALIDATE $? "Enable nginx 1.24"
 
 dnf install nginx -y &>>"$LOG_FILE"
 VALIDATE $? "Install nginx"
 
-# Start and enable Nginx services
-echo "Starting nginx service..." | tee -a "$LOG_FILE"
+# Start & Enable Nginx service
+echo -e "\n${Y}=== STARTING NGINX SERVICE ===${N}" | tee -a "$LOG_FILE"
 systemctl enable nginx &>>"$LOG_FILE"
 systemctl start nginx &>>"$LOG_FILE"
 VALIDATE $? "Start nginx service"
 
 # ====================
-# APPLICATION SETUP
+# FRONTEND APPLICATION SETUP
 # ====================
 
-echo -e "\n${Y}=== SETTING UP APPLICATION ===${N}" | tee -a "$LOG_FILE"
+echo -e "\n${Y}=== SETTING UP FRONTEND APPLICATION ===${N}" | tee -a "$LOG_FILE"
 
-rm -rf /app &>/dev/null
+# Remove default content
+rm -rf /usr/share/nginx/html/* &>>"$LOG_FILE"
+VALIDATE $? "Remove default nginx content"
 
-# Download and deploy app
-curl -L -o /tmp/frontend.zip https://roboshop-artifacts.s3.amazonaws.com/frontend-v3.zip
-VALIDATE $? "Download application"
+# Download frontend content
+curl -L -o /tmp/frontend.zip https://roboshop-artifacts.s3.amazonaws.com/frontend-v3.zip &>>"$LOG_FILE"
+VALIDATE $? "Download frontend application"
 
-cd /app && unzip -o /tmp/frontend.zip &>>"$LOG_FILE"
-VALIDATE $? "Extract application"
+# Extract frontend content
+cd /usr/share/nginx/html &>>"$LOG_FILE"
+unzip -o /tmp/frontend.zip &>>"$LOG_FILE"
+VALIDATE $? "Extract frontend application"
 
 # ====================
-# SERVICE SETUP (USING COPY)
+# NGINX CONFIGURATION
 # ====================
 
-echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
+echo -e "\n${Y}=== CONFIGURING NGINX REVERSE PROXY ===${N}" | tee -a "$LOG_FILE"
 
-# Copy service file - PROFESSIONAL APPROACH
-cp $SCRIPT_DIR/nginx.conf /etc/systemd/system/nginx.conf
-VALIDATE $? "Copy service file"
+# Copy nginx.conf file - PROFESSIONAL APPROACH
+cp $SCRIPT_DIR/nginx.conf /etc/nginx/nginx.conf &>>"$LOG_FILE"
+VALIDATE $? "Copy nginx configuration"
 
-chown -R roboshop:roboshop /app &>>"$LOG_FILE"
-VALIDATE $? "Set ownership"
+# Set proper ownership for nginx content
+chown -R nginx:nginx /usr/share/nginx/html &>>"$LOG_FILE"
+VALIDATE $? "Set nginx ownership"
 
+# Restart Nginx to apply changes
 systemctl restart nginx &>>"$LOG_FILE"
 VALIDATE $? "Restart nginx service"
 
-END_TIME=$(date +%s)
+END_TIME=$(date +s)
 TOTAL_TIME=$((END_TIME - START_TIME))
 echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE"
