@@ -57,7 +57,7 @@ cd /app && mv target/shipping-1.0.jar shipping.jar &>>"$LOG_FILE"
 VALIDATE $? "Rename JAR file"
 
 # ====================
-# SERVICE SETUP (USING COPY)
+# SECTION 6: SERVICE SETUP (USING COPY)
 # ====================
 
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
