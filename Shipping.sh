@@ -1,16 +1,11 @@
 #!/bin/bash
 
 USERID=$(id -u)
-R="\e[31m"
-G="\e[32m"
-Y="\e[33m"
-N="\e[0m"
-
+R="\e[31m"; G="\e[32m"; Y="\e[33m"; N="\e[0m"
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR=$(pwd)
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
-START_TIME=$(date +%s)
 
 mkdir -p "$LOGS_FOLDER"
 echo "Script started at: $(date)" | tee -a "$LOG_FILE"
