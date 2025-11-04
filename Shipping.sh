@@ -53,9 +53,9 @@ VALIDATE $? "Rename JAR file"
 # SERVICE SETUP SECTION
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 
-# ✅ FIXED: Copy shipping.service (not dispatch.service)
-cp $SCRIPT_DIR/shipping.service /etc/systemd/system/shipping.service &>>"$LOG_FILE"
-VALIDATE $? "Copy service file"
+# ✅ FIXED: Copy shipping.service
+cp "/home/ec2-user/Shell-Roboshop/shipping.service" "/etc/yum.repos.d/shipping.service"
+VALIDATE $? "Copy shipping repository file"
 
 chown -R roboshop:roboshop /app &>>"$LOG_FILE"
 VALIDATE $? "Set ownership"
