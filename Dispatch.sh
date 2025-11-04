@@ -8,7 +8,7 @@ N="\e[0m"
 
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-MONGODB_HOST=mongodb.awslearning.fun
+SCRIPT_DIR=$(pwd)  # ✅ ADDED: Missing SCRIPT_DIR
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 START_TIME=$(date +%s)
 
@@ -32,26 +32,25 @@ VALIDATE(){
     fi
 }
 
-dnf install golang -y &>>$LOG_FILE
+dnf install golang -y &>>"$LOG_FILE"
 VALIDATE $? "Installing golang"
 
 # Create user
 id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
 VALIDATE $? "Create roboshop user"
 
-# ✅ ADD THIS LINE: Create /app directory before using it
+# Create app directory
 mkdir -p /app &>>"$LOG_FILE"
 VALIDATE $? "Create app directory"
 
-# Download and deploy app
-curl -L -o /tmp/payment.zip https://roboshop-artifacts.s3.amazonaws.com/payment-v3.zip  &>>"$LOG_FILE"
+# ✅ FIXED: Download CORRECT Go application
+curl -L -o /tmp/dispatch.zip https://roboshop-artifacts.s3.amazonaws.com/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
-cd /app && unzip -o /tmp/payment.zip &>>"$LOG_FILE"
+cd /app && unzip -o /tmp/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
 # Go module setup and build
-echo "Setting up Go modules..." | tee -a "$LOG_FILE"
 cd /app
 go mod init dispatch &>>"$LOG_FILE"
 VALIDATE $? "Initialize Go module"
@@ -62,8 +61,14 @@ VALIDATE $? "Download Go dependencies"
 go build &>>"$LOG_FILE"
 VALIDATE $? "Build Go application"
 
-cp $SCRIPT_DIR/dispatch.service /etc/systemd/system/dispatch.service
-VALIDATE $? "Copy service file"
+# ✅ ADDED: Check if service file exists before copying
+if [ -f "$SCRIPT_DIR/dispatch.service" ]; then
+    cp "$SCRIPT_DIR/dispatch.service" /etc/systemd/system/dispatch.service
+    VALIDATE $? "Copy service file"
+else
+    echo -e "${R}ERROR: dispatch.service file not found${N}" | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 chown -R roboshop:roboshop /app &>>"$LOG_FILE"
 VALIDATE $? "Set ownership"
@@ -71,11 +76,12 @@ VALIDATE $? "Set ownership"
 systemctl daemon-reload &>>"$LOG_FILE"
 VALIDATE $? "Reload systemd"
 
-systemctl enable dispatch &>>$LOG_FILE
-VALIDATE $? "Enabling Dispatch"
-systemctl start dispatch &>>$LOG_FILE
-VALIDATE $? "Starting Dispatch"
+systemctl enable dispatch &>>"$LOG_FILE"
+VALIDATE $? "Enable dispatch"
+
+systemctl start dispatch &>>"$LOG_FILE"
+VALIDATE $? "Start dispatch"
 
 END_TIME=$(date +%s)
-TOTAL_TIME=$(( $END_TIME - $START_TIME))
-echo -e "Script executed in: $Y $TOTAL_TIME Seconds $N"
+TOTAL_TIME=$((END_TIME - START_TIME))
+echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE"
