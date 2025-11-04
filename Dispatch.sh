@@ -39,20 +39,17 @@ VALIDATE $? "Installing golang"
 id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
 VALIDATE $? "Create roboshop user"
 
-# Create app directory
 mkdir -p /app &>>"$LOG_FILE"
 VALIDATE $? "Create app directory"
 
-# ✅ FIXED: Download CORRECT Go application
 curl -L -o /tmp/dispatch.zip https://roboshop-artifacts.s3.amazonaws.com/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
 cd /app && unzip -o /tmp/dispatch.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
-# Go module setup and build
 cd /app
-go mod init dispatch &>>"$LOG_FILE"
+[ -f "go.mod" ] || go mod init dispatch &>>"$LOG_FILE"
 VALIDATE $? "Initialize Go module"
 
 go get &>>"$LOG_FILE"
