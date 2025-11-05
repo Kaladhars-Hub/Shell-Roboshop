@@ -104,12 +104,65 @@ npm install &>>"$LOG_FILE"
 VALIDATE $? "Install dependencies"
 
 # ====================
-# SECTION 6: SERVICE SETUP (USING COPY)
+# SECTION 6: DATABASE SETUP (FIXED)
+# ====================
+
+echo -e "\n${Y}=== SETTING UP DATABASE ===${N}" | tee -a "$LOG_FILE"
+
+# 1. Copy MongoDB repo FIRST
+cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo
+VALIDATE $? "Copy MongoDB repo"
+
+# 2. Install MongoDB SERVER (not just client)
+dnf install mongodb-org -y &>>"$LOG_FILE"
+VALIDATE $? "Install MongoDB server"
+
+# 3. Start and enable MongoDB service
+systemctl enable mongod &>>"$LOG_FILE"
+VALIDATE $? "Enable MongoDB service"
+
+systemctl start mongod &>>"$LOG_FILE"
+VALIDATE $? "Start MongoDB service"
+
+# 4. Install MongoDB client
+dnf install mongodb-mongosh -y &>>"$LOG_FILE"
+VALIDATE $? "Install MongoDB client"
+
+# 5. Wait for MongoDB to be ready
+echo "Waiting for MongoDB to start..." | tee -a "$LOG_FILE"
+sleep 10
+
+# 6. Test MongoDB connection
+echo "Testing MongoDB connection..." | tee -a "$LOG_FILE"
+if mongosh --host $MONGODB_HOST --eval "db.adminCommand('ping')" &>>"$LOG_FILE"; then
+    echo -e "${G}MongoDB connection successful${N}" | tee -a "$LOG_FILE"
+else
+    echo -e "${Y}Remote MongoDB connection failed, trying localhost...${N}" | tee -a "$LOG_FILE"
+    MONGODB_HOST="localhost"
+    mongosh --host $MONGODB_HOST --eval "db.adminCommand('ping')" &>>"$LOG_FILE"
+    VALIDATE $? "Test local MongoDB connection"
+fi
+
+# 7. Load database data (only if file exists)
+if [ -f /app/schema/catalogue.js ]; then
+    echo "Loading catalogue schema..." | tee -a "$LOG_FILE"
+    mongosh --host $MONGODB_HOST </app/schema/catalogue.js &>>"$LOG_FILE"
+    VALIDATE $? "Load catalogue schema"
+elif [ -f /app/db/master-data.js ]; then
+    echo "Loading master data..." | tee -a "$LOG_FILE"
+    mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
+    VALIDATE $? "Load master data"
+else
+    echo -e "${Y}No database script found, skipping data load${N}" | tee -a "$LOG_FILE"
+fi
+
+# ====================
+# SECTION 7: SERVICE SETUP (MOVED AFTER DATABASE)
 # ====================
 
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 
-# Copy service file - PROFESSIONAL APPROACH
+# Copy service file
 cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service
 VALIDATE $? "Copy service file"
 
@@ -126,22 +179,6 @@ systemctl start catalogue &>>"$LOG_FILE"
 VALIDATE $? "Start service"
 
 # ====================
-# SECTION 7: DATABASE SETUP (USING COPY)
-# ====================
-
-echo -e "\n${Y}=== SETTING UP DATABASE ===${N}" | tee -a "$LOG_FILE"
-
-# Copy MongoDB repo - PROFESSIONAL APPROACH
-cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo
-VALIDATE $? "Copy MongoDB repo"
-
-dnf install mongodb-mongosh -y &>>"$LOG_FILE"
-VALIDATE $? "Install MongoDB client"
-
-mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
-VALIDATE $? "Load database data"
-
-# ====================
 # SECTION 8: COMPLETION
 # ====================
 
@@ -150,4 +187,5 @@ echo -e "${G}✅ CATALOGUE INSTALLATION COMPLETED${N}" | tee -a "$LOG_FILE"
 echo -e "${G}===============================================${N}" | tee -a "$LOG_FILE"
 echo -e "${Y}AMI: $AMI_ID${N}" | tee -a "$LOG_FILE"
 echo -e "${Y}MongoDB: $MONGODB_HOST${N}" | tee -a "$LOG_FILE"
+echo -e "${Y}Service Status: $SERVICE_STATUS${N}" | tee -a "$LOG_FILE"
 echo "Completed at: $(date)" | tee -a "$LOG_FILE"
