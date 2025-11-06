@@ -1,51 +1,32 @@
 #!/bin/bash
 
-# =============================================
-# ROBOSHOP - CATALOGUE COMPONENT SETUP SCRIPT
-# =============================================
+# =============================================================================
+# ROBOSHOP CATALOGUE SERVICE INSTALLATION SCRIPT
+# =============================================================================
+# This script installs and configures the Catalogue microservice
+# Catalogue manages product listings in RoboShop application
+# =============================================================================
 
-# ====================
-# SECTION 1: CONFIGURATION
-# ====================
-
-MONGODB_HOST="mongodb.awslearning.fun"            # MongoDB host from Route53
 USERID=$(id -u)
-SCRIPT_DIR=$(pwd)
+R="\e[31m"
+G="\e[32m"
+Y="\e[33m"
+N="\e[0m"
 
-# Color codes
-R="\e[31m"  # Red for errors
-G="\e[32m"  # Green for success  
-Y="\e[33m"  # Yellow for warnings
-N="\e[0m"   # No color (reset)
-
-# Logging setup
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONGODB_HOST=mongodb.awslearning.fun
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
+START_TIME=$(date +%s)
 
-# ====================
-# SECTION 2: INITIALIZATION
-# ====================
-
-# Create logs directory and file
 mkdir -p "$LOGS_FOLDER"
-touch "$LOG_FILE"
+echo "Script started at: $(date)" | tee -a "$LOG_FILE"
 
-# Write initial message
-echo "===============================================" | tee -a "$LOG_FILE"
-echo "Catalogue Setup Started at: $(date)" | tee -a "$LOG_FILE"
-echo "MongoDB Host: $MONGODB_HOST" | tee -a "$LOG_FILE"
-echo "===============================================" | tee -a "$LOG_FILE"
-
-# Root check
 if [ "$USERID" -ne 0 ]; then
-    echo -e "${R}ERROR: Run with root privilege${N}" | tee -a "$LOG_FILE"
+    echo -e "${R}ERROR:: Please run this script with root privilege${N}" | tee -a "$LOG_FILE"
     exit 1
 fi
-
-# ====================
-# SECTION 3: FUNCTIONS
-# ====================
 
 VALIDATE(){
     local exit_code=$1
@@ -59,127 +40,85 @@ VALIDATE(){
     fi
 }
 
-# ====================
-# SECTION 4: NODEJS SETUP
-# ====================
-
-echo -e "\n${Y}=== SETTING UP NODEJS ===${N}" | tee -a "$LOG_FILE"
-
+# Disable existing NodeJS modules
 dnf module disable nodejs -y &>>"$LOG_FILE"
-VALIDATE $? "Disable NodeJS"
+VALIDATE $? "Disable existing NodeJS modules"
 
-dnf module enable nodejs:20 -y &>>"$LOG_FILE" 
+# Enable NodeJS 20
+dnf module enable nodejs:20 -y &>>"$LOG_FILE"
 VALIDATE $? "Enable NodeJS 20"
 
+# Install NodeJS
 dnf install nodejs -y &>>"$LOG_FILE"
 VALIDATE $? "Install NodeJS"
 
-# ====================
-# SECTION 5: APPLICATION SETUP
-# ====================
+# Create roboshop user if doesn't exist
+id roboshop &>>"$LOG_FILE"
+if [ $? -ne 0 ]; then
+    useradd roboshop &>>"$LOG_FILE"
+    VALIDATE $? "Create roboshop user"
+else
+    echo -e "roboshop user already exists ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
+fi
 
-echo -e "\n${Y}=== SETTING UP APPLICATION ===${N}" | tee -a "$LOG_FILE"
-
-rm -rf /app &>/dev/null
+# Create app directory
 mkdir -p /app &>>"$LOG_FILE"
-VALIDATE $? "Create app directory"
+VALIDATE $? "Create /app directory"
 
-# Create user
-id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
-VALIDATE $? "Create roboshop user"
+# Download catalogue application
+curl -L -o /tmp/catalogue.zip https://roboshop-builds.s3.amazonaws.com/catalogue.zip &>>"$LOG_FILE"
+VALIDATE $? "Download catalogue application"
 
-# Download and deploy app
-curl -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip &>>"$LOG_FILE"
-VALIDATE $? "Download application"
+# Extract application
+cd /app
+rm -rf /app/* &>>"$LOG_FILE"
+unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
+VALIDATE $? "Extract catalogue application"
 
-cd /app && unzip -o /tmp/catalogue.zip &>>"$LOG_FILE"
-VALIDATE $? "Extract application"
-
+# Install npm dependencies
 npm install &>>"$LOG_FILE"
-VALIDATE $? "Install dependencies"
+VALIDATE $? "Install npm dependencies"
 
-# ====================
-# SECTION 6: DATABASE SETUP (FIXED)
-# ====================
+# Copy catalogue service file
+cp "$SCRIPT_DIR/catalogue.service" /etc/systemd/system/catalogue.service &>>"$LOG_FILE"
+VALIDATE $? "Copy catalogue service file"
 
-echo -e "\n${Y}=== SETTING UP DATABASE ===${N}" | tee -a "$LOG_FILE"
+# Set ownership
+chown -R roboshop:roboshop /app &>>"$LOG_FILE"
+VALIDATE $? "Set app directory ownership"
 
-# 1. Copy MongoDB repo FIRST
-cp $SCRIPT_DIR/mongo.repo /etc/yum.repos.d/mongo.repo
-VALIDATE $? "Copy MongoDB repo"
+# Reload systemd
+systemctl daemon-reload &>>"$LOG_FILE"
+VALIDATE $? "Reload systemd daemon"
 
-# 2. Install MongoDB SERVER (not just client)
-dnf install mongodb-org -y &>>"$LOG_FILE"
-VALIDATE $? "Install MongoDB server"
+# Enable catalogue service
+systemctl enable catalogue &>>"$LOG_FILE"
+VALIDATE $? "Enable catalogue service"
 
-# 3. Start and enable MongoDB service
-systemctl enable mongod &>>"$LOG_FILE"
-VALIDATE $? "Enable MongoDB service"
+# Start catalogue service
+systemctl start catalogue &>>"$LOG_FILE"
+VALIDATE $? "Start catalogue service"
 
-systemctl start mongod &>>"$LOG_FILE"
-VALIDATE $? "Start MongoDB service"
+# Copy MongoDB repo file
+cp "$SCRIPT_DIR/mongodb-org-7.0.repo" /etc/yum.repos.d/mongodb-org-7.0.repo &>>"$LOG_FILE"
+VALIDATE $? "Copy MongoDB repository file"
 
-# 4. Install MongoDB client
+# Install MongoDB client
 dnf install mongodb-mongosh -y &>>"$LOG_FILE"
 VALIDATE $? "Install MongoDB client"
 
-# 5. Wait for MongoDB to be ready
-echo "Waiting for MongoDB to start..." | tee -a "$LOG_FILE"
-sleep 10
-
-# 6. Test MongoDB connection
-echo "Testing MongoDB connection..." | tee -a "$LOG_FILE"
-if mongosh --host $MONGODB_HOST --eval "db.adminCommand('ping')" &>>"$LOG_FILE"; then
-    echo -e "${G}MongoDB connection successful${N}" | tee -a "$LOG_FILE"
+# Load initial data if master-data.js exists
+if [ -f /app/db/master-data.js ]; then
+    mongosh --host "$MONGODB_HOST" </app/db/master-data.js &>>"$LOG_FILE"
+    VALIDATE $? "Load catalogue initial data"
 else
-    echo -e "${Y}Remote MongoDB connection failed, trying localhost...${N}" | tee -a "$LOG_FILE"
-    MONGODB_HOST="localhost"
-    mongosh --host $MONGODB_HOST --eval "db.adminCommand('ping')" &>>"$LOG_FILE"
-    VALIDATE $? "Test local MongoDB connection"
+    echo -e "No master-data.js found ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
 fi
 
-# 7. Load database data (only if file exists)
-if [ -f /app/schema/catalogue.js ]; then
-    echo "Loading catalogue schema..." | tee -a "$LOG_FILE"
-    mongosh --host $MONGODB_HOST </app/schema/catalogue.js &>>"$LOG_FILE"
-    VALIDATE $? "Load catalogue schema"
-elif [ -f /app/db/master-data.js ]; then
-    echo "Loading master data..." | tee -a "$LOG_FILE"
-    mongosh --host $MONGODB_HOST </app/db/master-data.js &>>"$LOG_FILE"
-    VALIDATE $? "Load master data"
-else
-    echo -e "${Y}No database script found, skipping data load${N}" | tee -a "$LOG_FILE"
-fi
+# Restart catalogue service
+systemctl restart catalogue &>>"$LOG_FILE"
+VALIDATE $? "Restart catalogue service"
 
-# ====================
-# SECTION 7: SERVICE SETUP (MOVED AFTER DATABASE)
-# ====================
-
-echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
-
-# Copy service file
-cp $SCRIPT_DIR/catalogue.service /etc/systemd/system/catalogue.service
-VALIDATE $? "Copy service file"
-
-chown -R roboshop:roboshop /app &>>"$LOG_FILE"
-VALIDATE $? "Set ownership"
-
-systemctl daemon-reload &>>"$LOG_FILE"
-VALIDATE $? "Reload systemd"
-
-systemctl enable catalogue &>>"$LOG_FILE"
-VALIDATE $? "Enable service"
-
-systemctl start catalogue &>>"$LOG_FILE"  
-VALIDATE $? "Start service"
-
-# ====================
-# SECTION 8: COMPLETION
-# ====================
-
-echo -e "\n${G}===============================================${N}" | tee -a "$LOG_FILE"
-echo -e "${G}✅ CATALOGUE INSTALLATION COMPLETED${N}" | tee -a "$LOG_FILE"
-echo -e "${G}===============================================${N}" | tee -a "$LOG_FILE"
-echo -e "${Y}MongoDB: $MONGODB_HOST${N}" | tee -a "$LOG_FILE"
-echo -e "${Y}Service Status: $SERVICE_STATUS${N}" | tee -a "$LOG_FILE"
-echo "Completed at: $(date)" | tee -a "$LOG_FILE"
+END_TIME=$(date +%s)
+TOTAL_TIME=$(( $END_TIME - $START_TIME ))
+echo -e "Script executed in: $Y $TOTAL_TIME Seconds $N" | tee -a "$LOG_FILE"
