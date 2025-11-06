@@ -8,11 +8,7 @@
 # SECTION 1: CONFIGURATION
 # ====================
 
-# AMI Configuration
-AMI_ID="ami-09c813fb71547fc4f"                    # Base AMI ID
 MONGODB_HOST="mongodb.awslearning.fun"            # MongoDB host from Route53
-
-# Script Configuration
 USERID=$(id -u)
 SCRIPT_DIR=$(pwd)
 
