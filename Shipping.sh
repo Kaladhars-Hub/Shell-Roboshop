@@ -82,7 +82,7 @@ echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 cp $SCRIPT_DIR/shipping.service /etc/systemd/system/shipping.service &>>"$LOG_FILE"
 VALIDATE $? "Copy service file"
 
-chown -R roboshop:roboshop /app &>>"$LOG_ALE"
+chown -R roboshop:roboshop /app &>>"$LOG_FILE"
 VALIDATE $? "Set ownership"
 
 systemctl daemon-reload &>>"$LOG_FILE"
