@@ -100,7 +100,7 @@ systemctl start catalogue &>>"$LOG_FILE"
 VALIDATE $? "Start catalogue service"
 
 # Copy MongoDB repo file
-cp "$SCRIPT_DIR/mongodb-org-7.0.repo" /etc/yum.repos.d/mongodb-org-7.0.repo &>>"$LOG_FILE"
+cp "$SCRIPT_DIR/mongo.repo" /etc/yum.repos.d/mongo.repo &>>"$LOG_FILE"
 VALIDATE $? "Copy MongoDB repository file"
 
 # Install MongoDB client
