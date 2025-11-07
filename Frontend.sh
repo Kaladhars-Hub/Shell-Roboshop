@@ -47,11 +47,10 @@ VALIDATE $? "Enable nginx 1.24"
 dnf install nginx -y &>>"$LOG_FILE"
 VALIDATE $? "Install nginx"
 
-# Start & Enable Nginx service
-echo -e "\n${Y}=== STARTING NGINX SERVICE ===${N}" | tee -a "$LOG_FILE"
+# Enable Nginx service (but don't start it yet)
+echo -e "\n${Y}=== ENABLING NGINX SERVICE ===${N}" | tee -a "$LOG_FILE"
 systemctl enable nginx &>>"$LOG_FILE"
-systemctl start nginx &>>"$LOG_FILE"
-VALIDATE $? "Start nginx service"
+VALIDATE $? "Enable nginx service"
 
 # ====================
 # FRONTEND APPLICATION SETUP
