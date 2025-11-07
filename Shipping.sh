@@ -95,7 +95,7 @@ systemctl start shipping &>>"$LOG_FILE"
 VALIDATE $? "Start service (initial)"
 
 # ====================
-# DATA LOADING
+# LOADING DATA INTO MYSQL
 # ====================
 
 echo -e "\n${Y}=== LOADING DATA INTO MYSQL ===${N}" | tee -a "$LOG_FILE"
@@ -104,23 +104,38 @@ echo -e "\n${Y}=== LOADING DATA INTO MYSQL ===${N}" | tee -a "$LOG_FILE"
 dnf install mysql -y &>>"$LOG_FILE"
 VALIDATE $? "Install MySQL client"
 
-# This 'if' check ensures the schema file exists
+# Step 1: Create the database
+echo "Creating database 'shipping'..." | tee -a "$LOG_FILE"
+mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" -e "CREATE DATABASE IF NOT EXISTS shipping;" &>>"$LOG_FILE"
+VALIDATE $? "Create 'shipping' database"
+
+# Step 2: Load the schema
 if [ -f /app/db/schema.sql ]; then
     echo "Loading schema..." | tee -a "$LOG_FILE"
-    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/db/schema.sql &>>"$LOG_FILE"
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" shipping < /app/db/schema.sql &>>"$LOG_FILE"
     VALIDATE $? "Load schema.sql"
 else
     echo -e "${R}/app/db/schema.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
     exit 1
 fi
 
-# This 'if' check ensures the data file exists
+# Step 3: Load the master data
 if [ -f /app/db/master-data.sql ]; then
     echo "Loading master data..." | tee -a "$LOG_FILE"
-    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/db/master-data.sql &>>"$LOG_FILE"
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" shipping < /app/db/master-data.sql &>>"$LOG_FILE"
     VALIDATE $? "Load master-data.sql"
 else
     echo -e "${R}/app/db/master-data.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Step 4: Load the app user permissions
+if [ -f /app/db/app-user.sql ]; then
+    echo "Loading app user..." | tee -a "$LOG_FILE"
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" shipping < /app/db/app-user.sql &>>"$LOG_FILE"
+    VALIDATE $? "Load app-user.sql"
+else
+    echo -e "${R}/app/db/app-user.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
     exit 1
 fi
 
