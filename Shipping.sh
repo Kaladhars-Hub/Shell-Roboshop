@@ -104,12 +104,23 @@ echo -e "\n${Y}=== LOADING DATA INTO MYSQL ===${N}" | tee -a "$LOG_FILE"
 dnf install mysql -y &>>"$LOG_FILE"
 VALIDATE $? "Install MySQL client"
 
-# This 'if' check ensures the data file exists before trying to load it
-if [ -f /app/schema/shipping.sql ]; then
-    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/schema/shipping.sql &>>"$LOG_FILE"
-    VALIDATE $? "Load shipping data"
+# This 'if' check ensures the schema file exists
+if [ -f /app/db/schema.sql ]; then
+    echo "Loading schema..." | tee -a "$LOG_FILE"
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/db/schema.sql &>>"$LOG_FILE"
+    VALIDATE $? "Load schema.sql"
 else
-    echo -e "${R}/app/schema/shipping.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
+    echo -e "${R}/app/db/schema.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# This 'if' check ensures the data file exists
+if [ -f /app/db/master-data.sql ]; then
+    echo "Loading master data..." | tee -a "$LOG_FILE"
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/db/master-data.sql &>>"$LOG_FILE"
+    VALIDATE $? "Load master-data.sql"
+else
+    echo -e "${R}/app/db/master-data.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
     exit 1
 fi
 
