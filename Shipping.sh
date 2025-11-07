@@ -1,12 +1,21 @@
 #!/bin/bash
 
 USERID=$(id -u)
-R="\e[31m"; G="\e[32m"; Y="\e[33m"; N="\e[0m"
+R="\e[31m"
+G="\e[32m"
+Y="\e[33m"
+N="\e[0m"
+
 LOGS_FOLDER="/var/log/Shell-Roboshop"
 SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-SCRIPT_DIR=$(pwd)
-MYSQL_HOST=mysql.awslearning.fun
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
+START_TIME=$(date +%s)
+
+# Define MySQL connection details
+MYSQL_HOST="mysql.awslearning.fun"
+MYSQL_USER="root"
+MYSQL_PASS="RoboShop@1"
 
 mkdir -p "$LOGS_FOLDER"
 echo "Script started at: $(date)" | tee -a "$LOG_FILE"
@@ -28,37 +37,52 @@ VALIDATE(){
     fi
 }
 
+# ====================
+# DEPENDENCY INSTALLATION
+# ====================
+
+echo -e "\n${Y}=== INSTALLING MAVEN ===${N}" | tee -a "$LOG_FILE"
 dnf install maven -y &>>"$LOG_FILE"
-VALIDATE $? "Installing Maven"
+VALIDATE $? "Install Maven"
+
+# ====================
+# APPLICATION SETUP
+# ====================
+
+echo -e "\n${Y}=== SETTING UP APPLICATION ===${N}" | tee -a "$LOG_FILE"
+
+rm -rf /app &>/dev/null
+mkdir -p /app &>>"$LOG_FILE"
+VALIDATE $? "Create app directory"
 
 # Create user
 id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
 VALIDATE $? "Create roboshop user"
 
-mkdir -p /app &>>"$LOG_FILE"
-VALIDATE $? "Create app directory"
-
 # Download and deploy app
 curl -L -o /tmp/shipping.zip https://roboshop-artifacts.s3.amazonaws.com/shipping-v3.zip &>>"$LOG_FILE"
 VALIDATE $? "Download application"
 
-cd /app && unzip -o /tmp/shipping.zip &>>"$LOG_FILE"
+cd /app 
+unzip -o /tmp/shipping.zip &>>"$LOG_FILE"
 VALIDATE $? "Extract application"
 
-cd /app && mvn clean package &>>"$LOG_FILE"
+# Build the application
+mvn clean package &>>"$LOG_FILE"
 VALIDATE $? "Build application"
-
-cd /app && mv target/shipping-1.0.jar shipping.jar &>>"$LOG_FILE"
+mv target/shipping-1.0.jar shipping.jar &>>"$LOG_FILE"
 VALIDATE $? "Rename JAR file"
 
-# SERVICE SETUP SECTION
+# ====================
+# SERVICE SETUP
+# ====================
+
 echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
 
-# ✅ FIXED: Copy shipping.service
-cp -v "$SCRIPT_DIR/shipping.service" /etc/systemd/system/shipping.service &>>"$LOG_FILE"
+cp $SCRIPT_DIR/shipping.service /etc/systemd/system/shipping.service &>>"$LOG_FILE"
 VALIDATE $? "Copy service file"
 
-chown -R roboshop:roboshop /app &>>"$LOG_FILE"
+chown -R roboshop:roboshop /app &>>"$LOG_ALE"
 VALIDATE $? "Set ownership"
 
 systemctl daemon-reload &>>"$LOG_FILE"
@@ -67,30 +91,35 @@ VALIDATE $? "Reload systemd"
 systemctl enable shipping &>>"$LOG_FILE"
 VALIDATE $? "Enable service"
 
-systemctl start shipping &>>"$LOG_FILE"
-VALIDATE $? "Start service"
+systemctl start shipping &>>"$LOG_FILE"  
+VALIDATE $? "Start service (initial)"
 
 # ====================
-# DATABASE SETUP
+# DATA LOADING
 # ====================
 
-echo -e "\n${Y}=== SETTING UP DATABASE ===${N}" | tee -a "$LOG_FILE"
+echo -e "\n${Y}=== LOADING DATA INTO MYSQL ===${N}" | tee -a "$LOG_FILE"
 
+# Install MySQL Client to load data
 dnf install mysql -y &>>"$LOG_FILE"
 VALIDATE $? "Install MySQL client"
 
-mysql -h mysql.awslearning.fun -uroot -pRoboShop@1 < /app/db/schema.sql &>>"$LOG_FILE"
-VALIDATE $? "Load database schema"
+# This 'if' check ensures the data file exists before trying to load it
+if [ -f /app/schema/shipping.sql ]; then
+    mysql -h "$MYSQL_HOST" -u"$MYSQL_USER" -p"$MYSQL_PASS" < /app/schema/shipping.sql &>>"$LOG_FILE"
+    VALIDATE $? "Load shipping data"
+else
+    echo -e "${R}/app/schema/shipping.sql not found... FAILURE${N}" | tee -a "$LOG_FILE"
+    exit 1
+fi
 
-mysql -h mysql.awslearning.fun -uroot -pRoboShop@1 < /app/db/app-user.sql &>>"$LOG_FILE"
-VALIDATE $? "Create application user"
-
-mysql -h mysql.awslearning.fun -uroot -pRoboShop@1 < /app/db/master-data.sql &>>"$LOG_FILE"
-VALIDATE $? "Load master data"
+# ====================
+# FINAL RESTART
+# ====================
 
 systemctl restart shipping &>>"$LOG_FILE"
 VALIDATE $? "Restart shipping service"
 
 END_TIME=$(date +%s)
 TOTAL_TIME=$((END_TIME - START_TIME))
-echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE"# Test change - Tue Nov  4 23:11:28 IST 2025
+echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE"
