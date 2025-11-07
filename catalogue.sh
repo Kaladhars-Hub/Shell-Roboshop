@@ -107,13 +107,9 @@ VALIDATE $? "Copy MongoDB repository file"
 dnf install mongodb-mongosh -y &>>"$LOG_FILE"
 VALIDATE $? "Install MongoDB client"
 
-# Load initial data if master-data.js exists
-if [ -f /app/db/master-data.js ]; then
-    mongosh --host "$MONGODB_HOST" </app/db/master-data.js &>>"$LOG_FILE"
-    VALIDATE $? "Load catalogue initial data"
-else
-    echo -e "No master-data.js found ... ${Y}SKIPPING${N}" | tee -a "$LOG_FILE"
-fi
+# Load data 
+mongosh --host mongodb.awslearning.fun < /app/schema/catalogue.js
+VALIDATE $? "Load catalogue data"
 
 # Restart catalogue service
 systemctl restart catalogue &>>"$LOG_FILE"
