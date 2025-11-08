@@ -1,41 +1,41 @@
 #!/bin/bash
 
 AMI_ID="ami-09c813fb71547fc4f"
-SG_ID="sg-058422fa498bf5032"
-ZONE_ID=Z048371223T029UH4YGSA
-DOMAIN_NAME=awslearning.fun
+SG_ID="sg-07c8acf3fa6b923fa" # replace with your SG ID
+ZONE_ID="Z0948150OFPSYTNVYZOY" # replace with your ID
+DOMAIN_NAME="awslearning.fun"
 
-for instance in $@
+for instance in $@ # mongodb redis mysql
 do
-    Instance_ID=$(aws ec2 run-instances --image-id $AMI_ID --instance-type t3.micro --security-group-ids sg-058422fa498bf5032 --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance}]" --query 'Instances[0].InstanceId' --output text)
+    INSTANCE_ID=$(aws ec2 run-instances --image-id $AMI_ID --instance-type t3.micro --security-group-ids $SG_ID --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance}]" --query 'Instances[0].InstanceId' --output text)
 
-# Get Private IP
+    # Get Private IP
     if [ $instance != "frontend" ]; then
-         IP=$(aws ec2 describe-instances --instance-ids $Instance_ID --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
-         RECORD_NAME="$instance.$DOMAIN_NAME" #mongodb.awslearning.fun
+        IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text)
+        RECORD_NAME="$instance.$DOMAIN_NAME" # mongodb.awslearning.fun
     else
-        IP=$(aws ec2 describe-instances --instance-ids $Instance_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-        RECORD_NAME="$instance.$DOMAIN_NAME" #awslearning.fun
+        IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+        RECORD_NAME="$DOMAIN_NAME" # awslearning.fun
     fi
 
-    echo "$instance: $IP"    
+    echo "$instance: $IP"
 
     aws route53 change-resource-record-sets \
-  --hosted-zone-id $ZONE_ID \
-  --change-batch '
-  {
-    "Comment": "Testing creating a record set"
-    ,"Changes": [{
-      "Action"              : "UPSERT"
-      ,"ResourceRecordSet"  : {
-        "Name"              : "'$RECORD_NAME'"
-        ,"Type"             : "A"
-        ,"TTL"              : 1
-        ,"ResourceRecords"  : [{
-            "Value"         : "'" $IP "'"
+    --hosted-zone-id $ZONE_ID \
+    --change-batch '
+    {
+        "Comment": "Updating record set"
+        ,"Changes": [{
+        "Action"              : "UPSERT"
+        ,"ResourceRecordSet"  : {
+            "Name"              : "'$RECORD_NAME'"
+            ,"Type"             : "A"
+            ,"TTL"              : 1
+            ,"ResourceRecords"  : [{
+                "Value"         : "'$IP'"
+            }]
+        }
         }]
-      }
-    }]
-  }
-  '
+    }
+    '
 done

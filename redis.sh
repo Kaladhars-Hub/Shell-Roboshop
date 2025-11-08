@@ -6,29 +6,24 @@ G="\e[32m"
 Y="\e[33m"
 N="\e[0m"
 
-LOGS_FOLDER="/var/log/Shell-Roboshop"
-SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-MONGODB_HOST=mongodb.awslearning.fun
-LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
+LOGS_FOLDER="/var/log/shell-roboshop"
+SCRIPT_NAME=$( echo $0 | cut -d "." -f1 )
+LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log" # /var/log/shell-script/16-logs.log
 START_TIME=$(date +%s)
+mkdir -p $LOGS_FOLDER
+echo "Script started executed at: $(date)" | tee -a $LOG_FILE
 
-mkdir -p "$LOGS_FOLDER"
-echo "Script started at: $(date)" | tee -a "$LOG_FILE"
-
-if [ "$USERID" -ne 0 ]; then
-    echo -e "${R}ERROR:: Please run this script with root privilege${N}" | tee -a "$LOG_FILE"
-    exit 1
+if [ $USERID -ne 0 ]; then
+    echo "ERROR:: Please run this script with root privelege"
+    exit 1 # failure is other than 0
 fi
 
-VALIDATE(){
-    local exit_code=$1
-    local action_name=$2
-    
-    if [ "$exit_code" -ne 0 ]; then
-        echo -e "$action_name ... ${R}FAILURE${N}" | tee -a "$LOG_FILE"
+VALIDATE(){ # functions receive inputs through args just like shell script args
+    if [ $1 -ne 0 ]; then
+        echo -e "$2 ... $R FAILURE $N" | tee -a $LOG_FILE
         exit 1
     else
-        echo -e "$action_name ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+        echo -e "$2 ... $G SUCCESS $N" | tee -a $LOG_FILE
     fi
 }
 
@@ -36,7 +31,7 @@ dnf module disable redis -y &>>$LOG_FILE
 VALIDATE $? "Disabling Default Redis"
 dnf module enable redis:7 -y &>>$LOG_FILE
 VALIDATE $? "Enabling Redis 7"
-dnf install redis -y &>>$LOG_FILE
+dnf install redis -y  &>>$LOG_FILE
 VALIDATE $? "Installing Redis"
 
 sed -i -e 's/127.0.0.1/0.0.0.0/g' -e '/protected-mode/ c protected-mode no' /etc/redis/redis.conf
@@ -48,5 +43,5 @@ systemctl start redis &>>$LOG_FILE
 VALIDATE $? "Starting Redis"
 
 END_TIME=$(date +%s)
-TOTAL_TIME=$(( $END_TIME - $START_TIME))
+TOTAL_TIME=$(( $END_TIME - $START_TIME ))
 echo -e "Script executed in: $Y $TOTAL_TIME Seconds $N"

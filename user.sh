@@ -6,88 +6,69 @@ G="\e[32m"
 Y="\e[33m"
 N="\e[0m"
 
-LOGS_FOLDER="/var/log/Shell-Roboshop"
-SCRIPT_NAME=$(basename "$0" | cut -d "." -f1)
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+LOGS_FOLDER="/var/log/shell-roboshop"
+SCRIPT_NAME=$( echo $0 | cut -d "." -f1 )
+SCRIPT_DIR=$PWD
 MONGODB_HOST=mongodb.awslearning.fun
-LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
-START_TIME=$(date +%s)
+LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log" # /var/log/shell-script/16-logs.log
 
-mkdir -p "$LOGS_FOLDER"
-echo "Script started at: $(date)" | tee -a "$LOG_FILE"
+mkdir -p $LOGS_FOLDER
+echo "Script started executed at: $(date)" | tee -a $LOG_FILE
 
-if [ "$USERID" -ne 0 ]; then
-    echo -e "${R}ERROR:: Please run this script with root privilege${N}" | tee -a "$LOG_FILE"
-    exit 1
+if [ $USERID -ne 0 ]; then
+    echo "ERROR:: Please run this script with root privelege"
+    exit 1 # failure is other than 0
 fi
 
-VALIDATE(){
-    local exit_code=$1
-    local action_name=$2
-    
-    if [ "$exit_code" -ne 0 ]; then
-        echo -e "$action_name ... ${R}FAILURE${N}" | tee -a "$LOG_FILE"
+VALIDATE(){ # functions receive inputs through args just like shell script args
+    if [ $1 -ne 0 ]; then
+        echo -e "$2 ... $R FAILURE $N" | tee -a $LOG_FILE
         exit 1
     else
-        echo -e "$action_name ... ${G}SUCCESS${N}" | tee -a "$LOG_FILE"
+        echo -e "$2 ... $G SUCCESS $N" | tee -a $LOG_FILE
     fi
 }
 
-dnf module disable nodejs -y &>>"$LOG_FILE"
-VALIDATE $? "Disable NodeJS"
+##### NodeJS ####
+dnf module disable nodejs -y &>>$LOG_FILE
+VALIDATE $? "Disabling NodeJS"
+dnf module enable nodejs:20 -y  &>>$LOG_FILE
+VALIDATE $? "Enabling NodeJS 20"
+dnf install nodejs -y &>>$LOG_FILE
+VALIDATE $? "Installing NodeJS"
 
-dnf module enable nodejs:20 -y &>>"$LOG_FILE" 
-VALIDATE $? "Enable NodeJS 20"
+id roboshop &>>$LOG_FILE
+if [ $? -ne 0 ]; then
+    useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>$LOG_FILE
+    VALIDATE $? "Creating system user"
+else
+    echo -e "User already exist ... $Y SKIPPING $N"
+fi
 
-dnf install nodejs -y &>>"$LOG_FILE"
-VALIDATE $? "Install NodeJS"
+mkdir -p /app
+VALIDATE $? "Creating app directory"
 
-# ====================
-# APPLICATION SETUP
-# ====================
+curl -o /tmp/user.zip https://roboshop-artifacts.s3.amazonaws.com/user-v3.zip &>>$LOG_FILE
+VALIDATE $? "Downloading user application"
 
-echo -e "\n${Y}=== SETTING UP APPLICATION ===${N}" | tee -a "$LOG_FILE"
+cd /app 
+VALIDATE $? "Changing to app directory"
 
-rm -rf /app &>/dev/null
-mkdir -p /app &>>"$LOG_FILE"
-VALIDATE $? "Create app directory"
+rm -rf /app/*
+VALIDATE $? "Removing existing code"
 
-# Create user
-id roboshop &>/dev/null || useradd --system --home /app --shell /sbin/nologin roboshop &>>"$LOG_FILE"
-VALIDATE $? "Create roboshop user"
+unzip /tmp/user.zip &>>$LOG_FILE
+VALIDATE $? "unzip user"
 
-# Download and deploy app
-curl -L -o /tmp/user.zip https://roboshop-artifacts.s3.amazonaws.com/user-v3.zip &>>"$LOG_FILE"  # ✅ FIXED: Added &>>"$LOG_FILE" and line break
-VALIDATE $? "Download application"
-
-cd /app && unzip -o /tmp/user.zip &>>"$LOG_FILE"
-VALIDATE $? "Extract application"
-
-npm install &>>"$LOG_FILE"
+npm install &>>$LOG_FILE
 VALIDATE $? "Install dependencies"
 
-# ====================
-# SERVICE SETUP (USING COPY)
-# ====================
-
-echo -e "\n${Y}=== CONFIGURING SERVICE ===${N}" | tee -a "$LOG_FILE"
-
-# Copy service file - PROFESSIONAL APPROACH
 cp $SCRIPT_DIR/user.service /etc/systemd/system/user.service
-VALIDATE $? "Copy service file"
+VALIDATE $? "Copy systemctl service"
 
-chown -R roboshop:roboshop /app &>>"$LOG_FILE"
-VALIDATE $? "Set ownership"
+systemctl daemon-reload
+systemctl enable user &>>$LOG_FILE
+VALIDATE $? "Enable user"
 
-systemctl daemon-reload &>>"$LOG_FILE"
-VALIDATE $? "Reload systemd"
-
-systemctl enable user &>>"$LOG_FILE"
-VALIDATE $? "Enable service"  # ✅ FIXED: Changed "Enabling service" to "Enable service"
-
-systemctl start user &>>"$LOG_FILE"  
-VALIDATE $? "Start service"
-
-END_TIME=$(date +%s)
-TOTAL_TIME=$((END_TIME - START_TIME))
-echo -e "Script executed in: ${Y}${TOTAL_TIME} Seconds${N}" | tee -a "$LOG_FILE" 
+systemctl restart user
+VALIDATE $? "Restarted user"

@@ -1,17 +1,14 @@
 [Unit]
-Description=Catalogue Service
-After=network.target
+Description = Catalogue Service
 
 [Service]
-Type=simple
 User=roboshop
-WorkingDirectory=/app
-Environment="MONGO=true"
-Environment="MONGO_URL=mongodb://mongodb.awslearning.fun:27017/catalogue"
-ExecStart=/usr/bin/node /app/server.js
+Environment=MONGO=true
+// highlight-start
+Environment=MONGO_URL="mongodb://mongodb.awslearning.fun:27017/catalogue"
+// highlight-end
+ExecStart=/bin/node /app/server.js
 SyslogIdentifier=catalogue
-Restart=always
-RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
