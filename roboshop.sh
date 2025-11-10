@@ -1,7 +1,7 @@
 #!/bin/bash
 
 AMI_ID="ami-09c813fb71547fc4f"
-SG_ID="sg-07c8acf3fa6b923fa" # replace with your SG ID
+SG_ID="sg-025ff463acea8abd4" # replace with your SG ID
 ZONE_ID="Z0948150OFPSYTNVYZOY" # replace with your ID
 DOMAIN_NAME="awslearning.fun"
 
